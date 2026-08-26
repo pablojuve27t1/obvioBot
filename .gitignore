@@ -1,0 +1,24 @@
+# Secretos - NUNCA subir esto a git
+.env
+
+# Entorno virtual de Python
+venv/
+
+# Cache de Python
+__pycache__/
+*.pyc
+
+# Logs de ejecucion
+logs/
+
+# Backups locales (obviobot.py.bak*, executor.py.bak*, etc.)
+*.bak*
+
+# Version anterior del bot / scripts sueltos, no forman parte de obviobot
+copybot.py
+logger.py
+main.py
+market.py
+oracle.py
+strategy.py
+watchdog.py

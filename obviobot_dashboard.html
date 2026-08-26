@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obviobot Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+header { background: #141414; border-bottom: 1px solid #1f1f1f; padding: 0.9rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+.logo { font-size: 14px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #3dcf82; animation: pulse 2s infinite; flex-shrink: 0; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.last-update { font-size: 11px; color: #555; }
+.countdown { font-size: 11px; color: #3a3a3a; background: #1a1a1a; padding: 3px 8px; border-radius: 4px; min-width: 90px; text-align: center; }
+.refresh-btn { font-size: 12px; padding: 5px 12px; border: 1px solid #2a2a2a; border-radius: 6px; background: none; color: #888; cursor: pointer; }
+.refresh-btn:hover { border-color: #444; color: #fff; }
+main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+.metrics-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+.metric { background: #141414; border: 1px solid #1f1f1f; border-radius: 10px; padding: 1rem 1.1rem; }
+.metric-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+.metric-value { font-size: 24px; font-weight: 600; line-height: 1; }
+.metric-sub { font-size: 11px; color: #444; margin-top: 5px; }
+.green { color: #3dcf82; } .red { color: #e05a5a; } .neutral { color: #888; } .yellow { color: #f0a500; }
+.card { background: #141414; border: 1px solid #1f1f1f; border-radius: 10px; margin-bottom: 1.25rem; overflow: hidden; }
+.card-header { padding: 0.9rem 1.25rem; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+.card-title { font-size: 12px; font-weight: 500; color: #888; }
+.card-body { padding: 1.1rem 1.25rem; }
+.filter-tabs { display: flex; gap: 4px; }
+.tab { font-size: 11px; padding: 4px 10px; border: 1px solid #222; border-radius: 5px; background: none; color: #555; cursor: pointer; transition: all 0.12s; }
+.tab.active { border-color: #3dcf82; color: #3dcf82; background: rgba(61,207,130,0.08); }
+.tab:hover:not(.active) { border-color: #333; color: #888; }
+.chart-wrap { position: relative; height: 220px; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 10px; font-weight: 400; color: #444; padding: 7px 1.25rem; border-bottom: 1px solid #1a1a1a; text-transform: uppercase; letter-spacing: 0.05em; }
+td { padding: 9px 1.25rem; font-size: 12px; border-bottom: 1px solid #181818; color: #bbb; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #181818; }
+.market-name { max-width: 240px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ddd; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 500; }
+.badge-trade { background: rgba(240,165,0,0.1); color: #f0a500; }
+.badge-redeem { background: rgba(61,207,130,0.1); color: #3dcf82; }
+.empty { text-align: center; padding: 2rem; color: #333; font-size: 12px; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.stat-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-size: 12px; }
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: #555; }
+.stat-value { font-weight: 500; }
+.day-row { display: grid; grid-template-columns: 70px 1fr 75px; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid #181818; }
+.day-row:last-child { border-bottom: none; }
+.day-label { font-size: 11px; color: #555; }
+.day-bar-wrap { background: #1a1a1a; border-radius: 2px; height: 6px; }
+.day-bar { height: 6px; border-radius: 2px; min-width: 2px; transition: width 0.4s; }
+.day-pnl { font-size: 12px; font-weight: 500; text-align: right; }
+.cors-warning { background: #1a1200; border: 1px solid #3a2800; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: 12px; color: #f0a500; display: none; }
+@media (max-width: 700px) { .metrics-row { grid-template-columns: 1fr 1fr; } .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="live-dot"></div>Obviobot — Polymarket Bot</div>
+  <div class="header-right">
+    <span class="last-update" id="last-update">—</span>
+    <span class="countdown" id="countdown">próximo: —</span>
+    <button class="refresh-btn" onclick="loadAll()">↻ Actualizar</button>
+  </div>
+</header>
+<main>
+
+<div class="cors-warning" id="cors-warning">
+  ⚠️ <strong>Modo sin conexión:</strong> Abrí este archivo con el servidor Python para ver datos en tiempo real.<br>
+  Ejecutá: <code>python serve_dashboard.py</code> → luego abrí <strong>http://localhost:8080</strong>
+</div>
+
+<div class="metrics-row">
+  <div class="metric">
+    <div class="metric-label">Capital total</div>
+    <div class="metric-value" id="m-capital">$81.99</div>
+    <div class="metric-sub">Invertido: $42 + $30 · <span id="m-pct">+14.2%</span></div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">P&L posiciones abiertas</div>
+    <div class="metric-value" id="m-pnl">—</div>
+    <div class="metric-sub" id="m-pnl-sub">—</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Posiciones abiertas</div>
+    <div class="metric-value neutral" id="m-open">—</div>
+    <div class="metric-sub" id="m-open-sub">Max 7 simultáneas</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Efectivo disponible</div>
+    <div class="metric-value" id="m-cash">—</div>
+    <div class="metric-sub" id="m-cash-sub">—</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Evolución del capital</span>
+    <div class="filter-tabs">
+      <button class="tab active" onclick="setRange('all',this)">Todo</button>
+      <button class="tab" onclick="setRange('30d',this)">30d</button>
+      <button class="tab" onclick="setRange('14d',this)">14d</button>
+      <button class="tab" onclick="setRange('7d',this)">7d</button>
+    </div>
+  </div>
+  <div class="card-body"><div class="chart-wrap"><canvas id="capital-chart"></canvas></div></div>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Ganancias por día</span>
+      <div class="filter-tabs">
+        <button class="tab active" onclick="setDayRange(7,this)">7d</button>
+        <button class="tab" onclick="setDayRange(14,this)">14d</button>
+        <button class="tab" onclick="setDayRange(30,this)">30d</button>
+      </div>
+    </div>
+    <div class="card-body" id="gains-body"><div class="empty">Calculando...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Posiciones abiertas</span>
+      <span style="font-size:11px;color:#444;" id="open-count-label">—</span>
+    </div>
+    <table>
+      <thead><tr><th>Mercado</th><th>Precio</th><th>P&amp;L</th></tr></thead>
+      <tbody id="open-body"><tr><td colspan="3" class="empty">Cargando...</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Ganancias por mes</span>
+    <div class="filter-tabs">
+      <button class="tab active" onclick="setMonthMode('usd',this)">$ Dólares</button>
+      <button class="tab" onclick="setMonthMode('pct',this)">% Porcentaje</button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;gap:16px;margin-bottom:12px;font-size:11px;">
+      <span style="display:flex;align-items:center;gap:5px;color:#666;"><span style="width:10px;height:10px;border-radius:2px;background:#3dcf82;display:inline-block;"></span>Ganancia</span>
+      <span style="display:flex;align-items:center;gap:5px;color:#666;"><span style="width:10px;height:10px;border-radius:2px;background:#e05a5a;display:inline-block;"></span>Pérdida</span>
+    </div>
+    <div style="position:relative;height:200px;"><canvas id="monthly-chart"></canvas></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Actividad reciente</span>
+    <div class="filter-tabs">
+      <button class="tab active" onclick="setActFilter('all',this)">Todo</button>
+      <button class="tab" onclick="setActFilter('REDEEM',this)">Cobros</button>
+      <button class="tab" onclick="setActFilter('TRADE',this)">Trades</button>
+    </div>
+  </div>
+  <table>
+    <thead><tr><th>Mercado</th><th>Tipo</th><th>Precio</th><th>Monto</th><th>Fecha</th></tr></thead>
+    <tbody id="hist-body"><tr><td colspan="5" class="empty">Cargando...</td></tr></tbody>
+  </table>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Resumen general</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;">
+      <div>
+        <div class="stat-row"><span class="stat-label">Capital depositado</span><span class="stat-value">$72.00</span></div>
+        <div class="stat-row"><span class="stat-label">Capital actual</span><span class="stat-value green" id="s-capital">$81.99</span></div>
+        <div class="stat-row"><span class="stat-label">Ganancia neta</span><span class="stat-value green" id="s-pnl">+$9.99</span></div>
+        <div class="stat-row"><span class="stat-label">Retorno total</span><span class="stat-value green" id="s-ret">+13.9%</span></div>
+      </div>
+      <div>
+        <div class="stat-row"><span class="stat-label">Trades ejecutados</span><span class="stat-value" id="s-trades">—</span></div>
+        <div class="stat-row"><span class="stat-label">Cobros realizados</span><span class="stat-value" id="s-redeems">—</span></div>
+        <div class="stat-row"><span class="stat-label">Posiciones abiertas</span><span class="stat-value" id="s-open">—</span></div>
+        <div class="stat-row"><span class="stat-label">Capital en juego</span><span class="stat-value" id="s-injuego">—</span></div>
+      </div>
+      <div>
+        <div class="stat-row"><span class="stat-label">Bot activo desde</span><span class="stat-value">30 May 2026</span></div>
+        <div class="stat-row"><span class="stat-label">Estrategia</span><span class="stat-value">NO obvios ≥94¢</span></div>
+        <div class="stat-row"><span class="stat-label">Apuesta dinámica</span><span class="stat-value">5% capital</span></div>
+        <div class="stat-row"><span class="stat-label">Max posiciones</span><span class="stat-value">7 simultáneas</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+<script>
+const WALLET = '0x93d06c4c9C72a0eAA7EA77dC0159A6E91408FcDc';
+const DEPOSITED = 72.00; // $42 + $30
+
+// Historial real día a día desde capturas de Polymarket
+const DAILY_HISTORY = [
+  {d:'2026-05-30', v:42.00}, {d:'2026-06-01', v:41.71}, {d:'2026-06-02', v:42.04},
+  {d:'2026-06-03', v:37.43}, {d:'2026-06-05', v:38.65}, {d:'2026-06-06', v:39.23},
+  {d:'2026-06-08', v:38.98}, {d:'2026-06-12', v:39.95}, {d:'2026-06-18', v:40.87},
+  {d:'2026-06-22', v:41.44}, {d:'2026-06-23', v:41.80}, {d:'2026-06-24', v:42.52},
+  {d:'2026-06-25', v:43.14}, {d:'2026-06-26', v:43.86}, {d:'2026-07-01', v:47.50},
+  {d:'2026-07-03', v:79.80}, {d:'2026-07-06', v:81.99},
+];
+
+const MONTHLY_DATA = [
+  { month: 'May', start: 42.00, end: 39.23 },
+  { month: 'Jun', start: 39.23, end: 47.50 },
+  { month: 'Jul', start: 47.50, end: null },
+];
+
+let chartInst = null, monthlyChartInst = null;
+let currentRange = 'all', currentDayRange = 7, currentActFilter = 'all', currentMonthMode = 'usd';
+let allActivity = [], allPositions = [];
+let nextRefreshSecs = 3600, cdInterval = null;
+let currentCapital = 81.99;
+
+function fmtDate(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
+    if (isNaN(d)) return '—';
+    return d.toLocaleDateString('es', {day:'2-digit', month:'short', year:'2-digit'});
+  } catch { return '—'; }
+}
+
+async function loadAll() {
+  nextRefreshSecs = 3600;
+  document.getElementById('last-update').textContent = 'Actualizando...';
+  document.getElementById('cors-warning').style.display = 'none';
+  
+  try {
+    const [posRes, actRes] = await Promise.allSettled([
+      fetch(`https://data-api.polymarket.com/positions?user=${WALLET}&sizeThreshold=0.01`),
+      fetch(`https://data-api.polymarket.com/activity?user=${WALLET}&limit=100`)
+    ]);
+
+    if (posRes.status === 'rejected' || actRes.status === 'rejected') {
+      throw new Error('CORS - usar servidor local');
+    }
+
+    const posData = posRes.value.ok ? await posRes.value.json() : [];
+    const actData = actRes.value.ok ? await actRes.value.json() : [];
+    
+    // Solo posiciones con valor real > 0 (filtrar expiradas)
+    allPositions = (Array.isArray(posData) ? posData : [])
+      .filter(p => parseFloat(p.currentValue || 0) > 0.01);
+    allActivity = Array.isArray(actData) ? actData : [];
+
+    const openVal  = allPositions.reduce((s,p) => s + parseFloat(p.currentValue||0), 0);
+    const openCost = allPositions.reduce((s,p) => s + parseFloat(p.size||0)*parseFloat(p.avgPrice||0.99), 0);
+    const openPnl  = openVal - openCost;
+    const trades   = allActivity.filter(a => a.type === 'TRADE');
+    const redeems  = allActivity.filter(a => a.type === 'REDEEM');
+
+    currentCapital = parseFloat((81.99 + openPnl).toFixed(2));
+    
+    // Actualizar punto de hoy
+    const todayStr = new Date().toISOString().slice(0,10);
+    const last = DAILY_HISTORY[DAILY_HISTORY.length-1];
+    if (last.d !== todayStr) {
+      DAILY_HISTORY.push({d: todayStr, v: currentCapital});
+    } else {
+      last.v = currentCapital;
+    }
+
+    const totalPnl = currentCapital - DEPOSITED;
+    const pct = (totalPnl / DEPOSITED * 100);
+    const cash = Math.max(0, currentCapital - openVal);
+
+    // Métricas
+    const capEl = document.getElementById('m-capital');
+    capEl.textContent = '$' + currentCapital.toFixed(2);
+    capEl.className = 'metric-value ' + (currentCapital >= DEPOSITED ? 'green' : 'red');
+    document.getElementById('m-pct').textContent = (pct>=0?'+':'') + pct.toFixed(1) + '%';
+
+    const pnlEl = document.getElementById('m-pnl');
+    pnlEl.textContent = (openPnl>=0?'+':'') + '$' + openPnl.toFixed(2);
+    pnlEl.className = 'metric-value ' + (openPnl>=0?'green':'red');
+    document.getElementById('m-pnl-sub').textContent = allPositions.length + ' pos · costo $' + openCost.toFixed(2);
+
+    document.getElementById('m-open').textContent = allPositions.length;
+    document.getElementById('m-open-sub').textContent = 'Max 7 · En juego $' + openCost.toFixed(2);
+
+    const cashEl = document.getElementById('m-cash');
+    cashEl.textContent = '$' + cash.toFixed(2);
+    cashEl.className = 'metric-value ' + (cash > 10 ? 'green' : 'yellow');
+    document.getElementById('m-cash-sub').textContent = allPositions.length < 7 ? 'Disponible' : 'Máx alcanzado';
+
+    // Resumen
+    document.getElementById('s-capital').textContent = '$' + currentCapital.toFixed(2);
+    document.getElementById('s-pnl').textContent = (totalPnl>=0?'+':'') + '$' + totalPnl.toFixed(2);
+    document.getElementById('s-ret').textContent = (pct>=0?'+':'') + pct.toFixed(2) + '%';
+    document.getElementById('s-trades').textContent = trades.length;
+    document.getElementById('s-redeems').textContent = redeems.length;
+    document.getElementById('s-open').textContent = allPositions.length;
+    document.getElementById('s-injuego').textContent = '$' + openCost.toFixed(2);
+
+    renderChart();
+    renderOpenPositions();
+    renderActivity();
+    renderDailyGains();
+    renderMonthlyChart();
+
+    document.getElementById('last-update').textContent =
+      'Actualizado: ' + new Date().toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  } catch(e) {
+    document.getElementById('cors-warning').style.display = 'block';
+    document.getElementById('last-update').textContent = 'Sin conexión — datos estáticos';
+    // Mostrar datos estáticos del historial
+    renderChart();
+    renderDailyGains();
+    renderMonthlyChart();
+  }
+}
+
+function getFilteredHistory() {
+  const h = [...DAILY_HISTORY];
+  if (currentRange === '7d')  return h.slice(-7);
+  if (currentRange === '14d') return h.slice(-14);
+  if (currentRange === '30d') return h.slice(-30);
+  return h;
+}
+
+function renderChart() {
+  const history = getFilteredHistory();
+  const labels = history.map(h => {
+    const d = new Date(h.d);
+    return d.toLocaleDateString('es',{day:'2-digit',month:'short'});
+  });
+  const data = history.map(h => h.v);
+  const ctx = document.getElementById('capital-chart').getContext('2d');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Capital',
+          data,
+          borderColor: '#3dcf82',
+          backgroundColor: 'rgba(61,207,130,0.07)',
+          borderWidth: 2,
+          pointRadius: 4,
+          pointBackgroundColor: data.map(v => v===null?'transparent':(v>=DEPOSITED?'#3dcf82':'#e05a5a')),
+          fill: true, tension: 0.35, spanGaps: true,
+        },
+        {
+          label: 'Depositado',
+          data: history.map(()=>DEPOSITED),
+          borderColor: '#2a2a2a', borderWidth: 1, borderDash: [5,4], pointRadius: 0, fill: false,
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index', intersect: false,
+          backgroundColor: '#1e1e1e', borderColor: '#2a2a2a', borderWidth: 1,
+          titleColor: '#666', bodyColor: '#e0e0e0',
+          callbacks: {
+            label: ctx => {
+              if (ctx.datasetIndex===1) return ' Depositado: $'+DEPOSITED.toFixed(2);
+              const v = ctx.parsed.y;
+              const diff = v - DEPOSITED;
+              return ` $${v.toFixed(2)} (${diff>=0?'+':''}$${diff.toFixed(2)})`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{color:'#3a3a3a',font:{size:11}}, grid:{display:false}, border:{color:'#1f1f1f'} },
+        y: {
+          ticks:{color:'#3a3a3a',font:{size:11},callback:v=>'$'+v.toFixed(0)},
+          grid:{color:'#1a1a1a'}, border:{color:'#1f1f1f'},
+          min: 36, max: Math.max(90, currentCapital + 5)
+        }
+      }
+    }
+  });
+}
+
+function renderOpenPositions() {
+  document.getElementById('open-count-label').textContent = allPositions.length + ' posiciones';
+  const tbody = document.getElementById('open-body');
+  if (!allPositions.length) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Sin posiciones abiertas</td></tr>';
+    return;
+  }
+  tbody.innerHTML = allPositions.map(p => {
+    const title = (p.title||p.question||'Mercado').substring(0,40);
+    const price = parseFloat(p.avgPrice||0.99);
+    const size  = parseFloat(p.size||0);
+    const cv    = parseFloat(p.currentValue||0);
+    const pnl   = cv - size*price;
+    const cls   = pnl>=0?'green':'red';
+    return `<tr>
+      <td><div class="market-name" title="${title}">${title}</div></td>
+      <td style="color:#666">${(price*100).toFixed(1)}¢</td>
+      <td class="${cls}">${pnl>=0?'+':''}$${pnl.toFixed(2)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderActivity() {
+  let items = allActivity.filter(a => ['TRADE','REDEEM'].includes(a.type));
+  if (currentActFilter !== 'all') items = items.filter(a => a.type===currentActFilter);
+  items = items.slice(0,20);
+  const tbody = document.getElementById('hist-body');
+  if (!items.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty">Sin actividad</td></tr>';
+    return;
+  }
+  tbody.innerHTML = items.map(a => {
+    const title = (a.title||'Mercado').substring(0,38);
+    const size  = parseFloat(a.size||a.amount||0);
+    const price = parseFloat(a.price||0);
+    // Intentar varios campos de fecha
+    const ts = a.timestamp || a.createdAt || a.created_at || a.date || null;
+    const dateStr = fmtDate(ts);
+    const badgeClass = a.type==='REDEEM'?'badge-redeem':'badge-trade';
+    const badgeText  = a.type==='REDEEM'?'Cobrado':'Trade';
+    const amtClass   = a.type==='REDEEM'?'green':'neutral';
+    return `<tr>
+      <td><div class="market-name" title="${title}">${title}</div></td>
+      <td><span class="badge ${badgeClass}">${badgeText}</span></td>
+      <td style="color:#555">${price>0?(price*100).toFixed(1)+'¢':'—'}</td>
+      <td class="${amtClass}">$${size.toFixed(2)}</td>
+      <td style="color:#444">${dateStr}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderDailyGains() {
+  // Calcular ganancias día a día desde el historial completo
+  const h = [...DAILY_HISTORY];
+  const days = [];
+  for (let i = 1; i < h.length; i++) {
+    if (h[i].v !== null && h[i-1].v !== null) {
+      const gain = parseFloat((h[i].v - h[i-1].v).toFixed(2));
+      const d = new Date(h[i].d);
+      const label = d.toLocaleDateString('es',{day:'2-digit',month:'short'});
+      days.push({ label, gain, date: h[i].d });
+    }
+  }
+  const filtered = days.slice(-currentDayRange);
+  const maxAbs = Math.max(...filtered.map(d=>Math.abs(d.gain)), 0.01);
+  const container = document.getElementById('gains-body');
+  if (!filtered.length) { container.innerHTML='<div class="empty">Sin datos</div>'; return; }
+  container.innerHTML = filtered.map(d => {
+    const cls    = d.gain>=0?'green':'red';
+    const barClr = d.gain>=0?'#3dcf82':'#e05a5a';
+    const barPct = (Math.abs(d.gain)/maxAbs*100).toFixed(1);
+    const sign   = d.gain>=0?'+':'';
+    return `<div class="day-row">
+      <span class="day-label">${d.label}</span>
+      <div class="day-bar-wrap"><div class="day-bar" style="width:${barPct}%;background:${barClr}"></div></div>
+      <span class="day-pnl ${cls}">${sign}$${Math.abs(d.gain).toFixed(2)}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderMonthlyChart() {
+  const data = JSON.parse(JSON.stringify(MONTHLY_DATA));
+  data[data.length-1].end = currentCapital;
+  const months = data.map(m => ({
+    month: m.month, gain: m.end-m.start,
+    pct: ((m.end-m.start)/m.start*100), start:m.start, end:m.end
+  }));
+  const labels  = months.map(m=>m.month);
+  const values  = months.map(m=>parseFloat((currentMonthMode==='usd'?m.gain:m.pct).toFixed(2)));
+  const colors  = values.map(v=>v>=0?'#3dcf82':'#e05a5a');
+  const bgClrs  = values.map(v=>v>=0?'rgba(61,207,130,0.12)':'rgba(224,90,90,0.12)');
+  const ctx = document.getElementById('monthly-chart').getContext('2d');
+  if (monthlyChartInst) monthlyChartInst.destroy();
+  monthlyChartInst = new Chart(ctx, {
+    type:'bar',
+    data:{ labels, datasets:[{ data:values, backgroundColor:bgClrs, borderColor:colors, borderWidth:2, borderRadius:6, borderSkipped:false }] },
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:false},
+        tooltip:{
+          backgroundColor:'#1e1e1e', borderColor:'#2a2a2a', borderWidth:1, titleColor:'#888', bodyColor:'#e0e0e0',
+          callbacks:{ label: ctx => {
+            const v=ctx.parsed.y; const m=months[ctx.dataIndex]; const sign=v>=0?'+':'';
+            return currentMonthMode==='usd'
+              ?[` Ganancia: ${sign}$${v.toFixed(2)}`, ` $${m.start.toFixed(2)} → $${m.end.toFixed(2)}`]
+              :[` Retorno: ${sign}${v.toFixed(2)}%`, ` $${m.start.toFixed(2)} → $${m.end.toFixed(2)}`];
+          }}
+        }
+      },
+      scales:{
+        x:{ ticks:{color:'#3a3a3a',font:{size:12}}, grid:{display:false}, border:{color:'#1f1f1f'} },
+        y:{ ticks:{color:'#3a3a3a',font:{size:11},callback:v=>currentMonthMode==='usd'?(v>=0?'+$':'-$')+Math.abs(v).toFixed(2):(v>=0?'+':'')+v.toFixed(1)+'%'}, grid:{color:'#1a1a1a'}, border:{color:'#1f1f1f'} }
+      }
+    }
+  });
+}
+
+function setRange(r,btn) { currentRange=r; btn.closest('.filter-tabs').querySelectorAll('.tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderChart(); }
+function setDayRange(n,btn) { currentDayRange=n; btn.closest('.filter-tabs').querySelectorAll('.tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderDailyGains(); }
+function setActFilter(f,btn) { currentActFilter=f; btn.closest('.filter-tabs').querySelectorAll('.tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderActivity(); }
+function setMonthMode(m,btn) { currentMonthMode=m; btn.closest('.filter-tabs').querySelectorAll('.tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderMonthlyChart(); }
+
+function startCountdown() {
+  if (cdInterval) clearInterval(cdInterval);
+  cdInterval = setInterval(() => {
+    nextRefreshSecs--;
+    if (nextRefreshSecs<=0) { loadAll(); return; }
+    const m=Math.floor(nextRefreshSecs/60), s=nextRefreshSecs%60;
+    document.getElementById('countdown').textContent='próximo: '+m+':'+String(s).padStart(2,'0');
+  }, 1000);
+}
+
+loadAll();
+startCountdown();
+</script>
+</body>
+</html>
