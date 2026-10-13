@@ -4,3 +4,4 @@ requests>=2.31.0
 python-dotenv>=1.0.0
 web3>=6.0.0
 py-clob-client-v2==1.0.1rc1
+dnspython>=2.6.0

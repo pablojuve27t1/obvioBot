@@ -11,6 +11,9 @@ __pycache__/
 # Logs de ejecucion
 logs/
 
+# Estado runtime generado por el bot (no es codigo)
+state.json
+
 # Backups locales (obviobot.py.bak*, executor.py.bak*, etc.)
 *.bak*
 

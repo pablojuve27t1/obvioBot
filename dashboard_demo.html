@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obviobot — Demo (Paper)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+header { background: #141414; border-bottom: 1px solid #1f1f1f; padding: 0.9rem 1.5rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 10; }
+.logo { font-size: 14px; font-weight: 600; color: #fff; display: flex; align-items: center; gap: 8px; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: #f0a500; animation: pulse 2s infinite; flex-shrink: 0; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+.mode-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: rgba(240,165,0,0.12); color: #f0a500; border: 1px solid rgba(240,165,0,0.3); font-weight: 600; letter-spacing: 0.04em; }
+.header-right { display: flex; align-items: center; gap: 10px; }
+.last-update { font-size: 11px; color: #555; }
+main { max-width: 1100px; margin: 0 auto; padding: 1.25rem 1.5rem; }
+.metrics-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 1.25rem; }
+.metric { background: #141414; border: 1px solid #1f1f1f; border-radius: 10px; padding: 1rem 1.1rem; }
+.metric-label { font-size: 10px; color: #555; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 5px; }
+.metric-value { font-size: 24px; font-weight: 600; line-height: 1; }
+.metric-sub { font-size: 11px; color: #444; margin-top: 5px; }
+.green { color: #3dcf82; } .red { color: #e05a5a; } .neutral { color: #888; } .yellow { color: #f0a500; }
+.card { background: #141414; border: 1px solid #1f1f1f; border-radius: 10px; margin-bottom: 1.25rem; overflow: hidden; }
+.card-header { padding: 0.9rem 1.25rem; border-bottom: 1px solid #1a1a1a; display: flex; align-items: center; justify-content: space-between; }
+.card-title { font-size: 12px; font-weight: 500; color: #888; }
+.card-body { padding: 1.1rem 1.25rem; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 10px; font-weight: 400; color: #444; padding: 7px 1.25rem; border-bottom: 1px solid #1a1a1a; text-transform: uppercase; letter-spacing: 0.05em; }
+td { padding: 9px 1.25rem; font-size: 12px; border-bottom: 1px solid #181818; color: #bbb; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #181818; }
+.market-name { max-width: 280px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #ddd; }
+.empty { text-align: center; padding: 2rem; color: #333; font-size: 12px; }
+.warn { background: #1a1200; border: 1px solid #3a2800; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; font-size: 12px; color: #f0a500; display: none; }
+.stat-row { display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #1a1a1a; font-size: 12px; }
+.stat-row:last-child { border-bottom: none; }
+.stat-label { color: #555; }
+.stat-value { font-weight: 500; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 600; letter-spacing: 0.02em; }
+.badge-confirma { background: rgba(61,207,130,0.1); color: #3dcf82; }
+.badge-contradice { background: rgba(224,90,90,0.12); color: #e05a5a; }
+.badge-incierto { background: rgba(240,165,0,0.1); color: #f0a500; }
+.badge-sindatos { background: rgba(120,120,120,0.12); color: #777; }
+.badge-abierta { background: rgba(120,120,120,0.12); color: #999; }
+.badge-esperando { background: rgba(240,165,0,0.1); color: #f0a500; }
+.badge-win { background: rgba(61,207,130,0.1); color: #3dcf82; }
+.badge-loss { background: rgba(224,90,90,0.12); color: #e05a5a; }
+.funnel-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 14px; background: #1a1a1a; }
+.funnel-seg { height: 100%; }
+.funnel-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: #888; }
+.funnel-legend span { display: flex; align-items: center; gap: 5px; }
+.funnel-dot { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+@media (max-width: 700px) { .metrics-row { grid-template-columns: 1fr 1fr; } .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><div class="live-dot"></div>Obviobot <span class="mode-badge" id="mode-badge">PAPER</span></div>
+  <div class="header-right">
+    <span class="last-update" id="last-update">—</span>
+  </div>
+</header>
+<main>
+
+<div class="warn" id="warn">
+  ⚠️ No se encuentra <code>state.json</code>. Asegurate de que <code>obviobot.py</code> esté corriendo
+  y de abrir este dashboard con <code>python serve_dashboard.py</code> (http://localhost:8080/dashboard_demo.html).
+</div>
+
+<div class="warn" id="uncertain-warn" style="display:none;background:#2a1010;border-color:#5a1e1e;color:#ff8080;">
+  🚨 <strong>Orden(es) con estado incierto</strong> — no se pudo confirmar que una orden GTC haya
+  quedado cancelada en Polymarket. El mercado afectado queda bloqueado sin reintentar hasta revisión
+  manual. <strong>Revisá directamente en Polymarket si hay una orden o posición real ahí.</strong>
+  <div id="uncertain-list" style="margin-top:8px;font-size:11px;"></div>
+</div>
+
+<div class="metrics-row">
+  <div class="metric">
+    <div class="metric-label">Capital (simulado)</div>
+    <div class="metric-value" id="m-capital">—</div>
+    <div class="metric-sub" id="m-capital-sub">—</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">P&L del día</div>
+    <div class="metric-value" id="m-pnl">—</div>
+    <div class="metric-sub" id="m-pnl-sub">Se resetea cada día (UTC)</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">P&L acumulado</div>
+    <div class="metric-value" id="m-pnl-total">—</div>
+    <div class="metric-sub" id="m-pnl-total-sub">—</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Posiciones abiertas</div>
+    <div class="metric-value neutral" id="m-open">—</div>
+    <div class="metric-sub">Max 7 simultáneas</div>
+  </div>
+  <div class="metric">
+    <div class="metric-label">Win rate</div>
+    <div class="metric-value" id="m-wr">—</div>
+    <div class="metric-sub" id="m-wr-sub">—</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Desglose de saldo</span></div>
+  <div class="card-body">
+    <div class="stat-row"><span class="stat-label">Saldo total</span><span class="stat-value" id="b-total">—</span></div>
+    <div class="stat-row"><span class="stat-label">Comprometido en operaciones en curso</span><span class="stat-value yellow" id="b-comprometido">—</span></div>
+    <div class="stat-row"><span class="stat-label">Pendiente por liberar (Polymarket)</span><span class="stat-value" id="b-pendiente">—</span></div>
+    <div class="stat-row"><span class="stat-label">Disponible para nueva operación</span><span class="stat-value green" id="b-disponible">—</span></div>
+    <div style="margin-top:8px;font-size:11px;color:#444;">
+      En modo PAPER, "pendiente por liberar" siempre es $0 — el bot acredita la ganancia/pérdida en el
+      instante que detecta el cierre, sin simular el paso de redención on-chain. En real, esta cifra reflejaría
+      posiciones ya resueltas que todavía no se redimieron en la wallet.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Posiciones abiertas (simuladas)</span>
+    <span style="font-size:11px;color:#444;" id="open-count-label">—</span>
+  </div>
+  <table>
+    <thead><tr><th>Mercado</th><th>Estado</th><th>Precio NO</th><th>Shares</th><th>Invertido</th><th>Fill</th><th>Retorno esp.</th><th>Cierra en</th><th>Corroboración</th></tr></thead>
+    <tbody id="open-body"><tr><td colspan="9" class="empty">Cargando...</td></tr></tbody>
+  </table>
+</div>
+
+<div class="two-col">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Embudo de decisiones (este proceso)</span></div>
+    <div class="card-body">
+      <div class="funnel-bar" id="funnel-bar"></div>
+      <div class="funnel-legend" id="funnel-legend"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><span class="card-title">Resumen del ciclo</span></div>
+    <div class="card-body">
+      <div class="stat-row"><span class="stat-label">Ciclo actual</span><span class="stat-value" id="s-cycle">—</span></div>
+      <div class="stat-row"><span class="stat-label">Mercados escaneados (acumulado)</span><span class="stat-value" id="s-scanned">—</span></div>
+      <div class="stat-row"><span class="stat-label">Trades ganados / perdidos</span><span class="stat-value" id="s-wl">—</span></div>
+      <div class="stat-row"><span class="stat-label">Próximo escaneo</span><span class="stat-value" id="s-next">—</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Calidad de ejecución</span></div>
+  <div class="card-body" id="execution-body">
+    <div class="stat-row"><span class="stat-label">Fill promedio (posiciones abiertas)</span><span class="stat-value" id="s-fillavg">—</span></div>
+    <div id="fail-breakdown" style="margin-top:10px;font-size:11px;color:#666;"></div>
+    <div style="margin-top:8px;font-size:11px;color:#444;">
+      En modo PAPER el fill siempre es 100% (no hay order book real que limite el tamaño) — esta tarjeta
+      cobra sentido recién en modo real, donde puede haber llenados parciales o fallidos por falta de liquidez.
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Historial de operaciones cerradas</span>
+    <span style="font-size:11px;color:#444;" id="journal-count-label">—</span>
+  </div>
+  <table>
+    <thead><tr><th>Cerrada</th><th>Mercado</th><th>Entrada</th><th>Fill</th><th>Resultado</th><th>P&amp;L</th><th>Corroboración</th></tr></thead>
+    <tbody id="journal-body"><tr><td colspan="7" class="empty">Cargando...</td></tr></tbody>
+  </table>
+  <div style="padding:0.75rem 1.25rem;font-size:11px;color:#444;border-top:1px solid #1a1a1a;">
+    Registro completo en <code>logs/trade_journal.csv</code> — cada fila incluye precio de entrada, shares,
+    retorno esperado y el detalle de la corroboración meteorológica (ciudad, pronóstico, umbral, margen).
+  </div>
+</div>
+
+</main>
+<script>
+function fmtRelative(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diffSec = Math.round((d - new Date()) / 1000);
+  if (isNaN(diffSec)) return '—';
+  if (diffSec <= 0) return 'en curso...';
+  const m = Math.floor(diffSec / 60), s = diffSec % 60;
+  return `en ${m}m ${s}s`;
+}
+
+function corrobBadge(verdict, city) {
+  const v = (verdict || 'SIN_DATOS').toUpperCase();
+  const map = {
+    CONFIRMA:   ['badge-confirma', 'Confirma'],
+    CONTRADICE: ['badge-contradice', 'Contradice'],
+    INCIERTO:   ['badge-incierto', 'Incierto'],
+    SIN_DATOS:  ['badge-sindatos', 'Sin datos'],
+  };
+  const [cls, label] = map[v] || map.SIN_DATOS;
+  const title = city ? ` title="${city}"` : '';
+  return `<span class="badge ${cls}"${title}>${label}</span>`;
+}
+
+function statusBadge(status, esperandoHoras) {
+  if (status === 'ESPERANDO_CIERRE') {
+    const h = esperandoHoras != null ? esperandoHoras.toFixed(1) + 'h' : '';
+    return `<span class="badge badge-esperando" title="Ya paso la hora nominal de cierre; esperando que Polymarket confirme el resultado">Esperando cierre (${h})</span>`;
+  }
+  return `<span class="badge badge-abierta">Abierta</span>`;
+}
+
+// Parser CSV minimo que respeta comillas (los titulos de mercado pueden traer comas).
+function parseCSV(text) {
+  const rows = [];
+  let row = [], field = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+      } else field += c;
+    } else {
+      if (c === '"') inQuotes = true;
+      else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+      else if (c === '\r') { /* ignore */ }
+      else field += c;
+    }
+  }
+  if (field.length || row.length) { row.push(field); rows.push(row); }
+  if (!rows.length) return [];
+  const header = rows[0];
+  return rows.slice(1).filter(r => r.length === header.length).map(r => {
+    const obj = {};
+    header.forEach((h, i) => obj[h] = r[i]);
+    return obj;
+  });
+}
+
+async function loadJournal() {
+  const tbody = document.getElementById('journal-body');
+  try {
+    const res = await fetch('logs/trade_journal.csv?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('no journal yet');
+    const rows = parseCSV(await res.text());
+    document.getElementById('journal-count-label').textContent = rows.length + ' operaciones';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin operaciones cerradas todavía</td></tr>';
+      return;
+    }
+    const last = rows.slice(-25).reverse();
+    tbody.innerHTML = last.map(r => {
+      const won = r.won === 'True' || r.won === 'true';
+      const pnl = parseFloat(r.pnl_usd || 0);
+      const settled = r.settled_at_iso ? new Date(r.settled_at_iso).toLocaleString('es', {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '—';
+      const entryPrice = r.no_price_entry ? (parseFloat(r.no_price_entry) * 100).toFixed(1) + '¢' : '—';
+      const fillPct = r.fill_ratio !== '' && r.fill_ratio != null ? (parseFloat(r.fill_ratio) * 100).toFixed(0) + '%' : '—';
+      const corrobDetail = r.corrob_verdict && r.corrob_verdict !== 'SIN_DATOS'
+        ? `${r.corrob_city || ''} ${r.corrob_forecast || ''}${r.corrob_unit || ''} vs ${r.corrob_threshold || ''}${r.corrob_unit || ''}`
+        : (r.corrob_city || '');
+      return `<tr>
+        <td>${settled}</td>
+        <td><div class="market-name" title="${r.title || ''}">${r.title || ''}</div></td>
+        <td>${entryPrice}</td>
+        <td>${fillPct}</td>
+        <td><span class="badge ${won ? 'badge-win' : 'badge-loss'}">${won ? 'GANADA' : 'PERDIDA'}</span></td>
+        <td class="${pnl >= 0 ? 'green' : 'red'}">${pnl >= 0 ? '+' : ''}$${pnl.toFixed(2)}</td>
+        <td>${corrobBadge(r.corrob_verdict, corrobDetail)}</td>
+      </tr>`;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty">Sin operaciones cerradas todavía</td></tr>';
+    document.getElementById('journal-count-label').textContent = '0 operaciones';
+  }
+}
+
+function renderFunnel(s) {
+  const f = s.funnel || { bought: 0, skipped_corrob: 0, skipped_maxpos: 0, orders_failed: 0 };
+  const segs = [
+    { label: 'Comprados', value: f.bought, color: '#3dcf82' },
+    { label: 'Saltados — corroboración en contra', value: f.skipped_corrob, color: '#e05a5a' },
+    { label: 'Saltados — cupo máximo', value: f.skipped_maxpos, color: '#f0a500' },
+    { label: 'Órdenes fallidas', value: f.orders_failed, color: '#666' },
+  ];
+  const total = segs.reduce((s, x) => s + x.value, 0);
+  const bar = document.getElementById('funnel-bar');
+  const legend = document.getElementById('funnel-legend');
+  if (total === 0) {
+    bar.innerHTML = '';
+    legend.innerHTML = '<span style="color:#444">Sin candidatos evaluados todavía en este proceso</span>';
+    return;
+  }
+  bar.innerHTML = segs.filter(s => s.value > 0).map(s =>
+    `<div class="funnel-seg" style="width:${(s.value / total * 100).toFixed(1)}%;background:${s.color}"></div>`
+  ).join('');
+  legend.innerHTML = segs.map(s =>
+    `<span><span class="funnel-dot" style="background:${s.color}"></span>${s.label}: ${s.value}</span>`
+  ).join('');
+}
+
+const FAIL_CATEGORY_LABELS = {
+  liquidez: 'Sin liquidez / timeout',
+  precio_movido: 'Precio se movió',
+  invalido: 'Datos inválidos',
+  otro: 'Otro',
+};
+
+function renderExecutionQuality(s) {
+  const positions = s.open_positions || [];
+  const avgEl = document.getElementById('s-fillavg');
+  if (!positions.length) {
+    avgEl.textContent = '—';
+  } else {
+    const avg = positions.reduce((sum, p) => sum + (p.fill_ratio != null ? p.fill_ratio : 1), 0) / positions.length;
+    avgEl.textContent = (avg * 100).toFixed(0) + '%';
+    avgEl.className = 'stat-value ' + (avg >= 0.99 ? 'green' : (avg >= 0.5 ? 'yellow' : 'red'));
+  }
+
+  const cats = (s.funnel && s.funnel.fail_categories) || {};
+  const entries = Object.entries(cats).filter(([, v]) => v > 0);
+  const box = document.getElementById('fail-breakdown');
+  if (!entries.length) {
+    box.innerHTML = '<span style="color:#444">Sin órdenes fallidas en este proceso</span>';
+    return;
+  }
+  box.innerHTML = 'Motivos de órdenes fallidas: ' + entries
+    .map(([k, v]) => `<b style="color:#ddd">${FAIL_CATEGORY_LABELS[k] || k}</b>: ${v}`)
+    .join(' · ');
+}
+
+async function loadState() {
+  try {
+    const res = await fetch('state.json?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) throw new Error('no state.json');
+    const s = await res.json();
+    document.getElementById('warn').style.display = 'none';
+
+    document.getElementById('mode-badge').textContent = s.paper ? 'PAPER' : 'REAL';
+    document.getElementById('mode-badge').style.color = s.paper ? '#f0a500' : '#e05a5a';
+
+    const capEl = document.getElementById('m-capital');
+    capEl.textContent = '$' + s.capital.toFixed(2);
+    capEl.className = 'metric-value ' + (s.capital >= s.initial_capital ? 'green' : 'red');
+    document.getElementById('m-capital-sub').textContent = 'Inicial: $' + s.initial_capital.toFixed(2);
+
+    const pnlEl = document.getElementById('m-pnl');
+    pnlEl.textContent = (s.daily_pnl >= 0 ? '+' : '') + '$' + s.daily_pnl.toFixed(2);
+    pnlEl.className = 'metric-value ' + (s.daily_pnl >= 0 ? 'green' : 'red');
+
+    const pnlTotal = s.pnl_acumulado != null ? s.pnl_acumulado : (s.capital - s.initial_capital);
+    const pnlTotalEl = document.getElementById('m-pnl-total');
+    pnlTotalEl.textContent = (pnlTotal >= 0 ? '+' : '') + '$' + pnlTotal.toFixed(2);
+    pnlTotalEl.className = 'metric-value ' + (pnlTotal >= 0 ? 'green' : 'red');
+    const pnlTotalPct = s.initial_capital ? (pnlTotal / s.initial_capital * 100) : 0;
+    document.getElementById('m-pnl-total-sub').textContent =
+      (pnlTotalPct >= 0 ? '+' : '') + pnlTotalPct.toFixed(1) + '% desde el inicio';
+
+    document.getElementById('m-open').textContent = s.open_positions.length;
+
+    const totalTrades = s.wins + s.losses;
+    const wr = totalTrades > 0 ? (s.wins / totalTrades * 100) : null;
+    document.getElementById('m-wr').textContent = wr !== null ? wr.toFixed(0) + '%' : 'N/A';
+    document.getElementById('m-wr-sub').textContent = `${s.wins}W / ${s.losses}L`;
+
+    document.getElementById('open-count-label').textContent = s.open_positions.length + ' posiciones';
+    const tbody = document.getElementById('open-body');
+    if (!s.open_positions.length) {
+      tbody.innerHTML = '<tr><td colspan="9" class="empty">Sin posiciones abiertas todavía — el bot sigue escaneando</td></tr>';
+    } else {
+      tbody.innerHTML = s.open_positions.map(p => {
+        const fillPct = (p.fill_ratio != null ? p.fill_ratio : 1) * 100;
+        const fillCls = fillPct >= 99 ? 'green' : (fillPct >= 50 ? 'yellow' : 'red');
+        return `<tr>
+        <td><div class="market-name" title="${p.title}">${p.title}</div></td>
+        <td>${statusBadge(p.status, p.esperando_desde_horas)}</td>
+        <td>${(p.no_price * 100).toFixed(1)}¢</td>
+        <td>${p.shares}</td>
+        <td>$${p.spent.toFixed(2)}</td>
+        <td class="${fillCls}">${fillPct.toFixed(0)}%</td>
+        <td class="green">+${(p.expected_return * 100).toFixed(1)}%</td>
+        <td>${p.hours_left != null ? p.hours_left.toFixed(1) + 'h' : '—'}</td>
+        <td>${corrobBadge(p.corrob_verdict, p.corrob_city)}</td>
+      </tr>`;
+      }).join('');
+    }
+
+    document.getElementById('s-cycle').textContent = s.cycle;
+    document.getElementById('s-scanned').textContent = s.scanned;
+    document.getElementById('s-wl').textContent = `${s.wins} / ${s.losses}`;
+    document.getElementById('s-next').textContent = fmtRelative(s.next_scan_at);
+
+    if (s.balance) {
+      document.getElementById('b-total').textContent = '$' + s.balance.total.toFixed(2);
+      document.getElementById('b-comprometido').textContent = '$' + s.balance.comprometido_en_curso.toFixed(2);
+      document.getElementById('b-pendiente').textContent = '$' + s.balance.pendiente_liberar_polymarket.toFixed(2);
+      document.getElementById('b-disponible').textContent = '$' + s.balance.disponible.toFixed(2);
+    }
+
+    renderFunnel(s);
+    renderExecutionQuality(s);
+
+    const uncertainBox = document.getElementById('uncertain-warn');
+    const uncertain = s.uncertain_orders || [];
+    if (uncertain.length) {
+      uncertainBox.style.display = 'block';
+      document.getElementById('uncertain-list').innerHTML = uncertain.map(u =>
+        `<div>• ${u.title} — detectado ${new Date(u.detected_at_iso).toLocaleString('es')} ${u.order_id ? '(order_id: ' + u.order_id.slice(0,16) + '...)' : ''}</div>`
+      ).join('');
+    } else {
+      uncertainBox.style.display = 'none';
+    }
+
+    document.getElementById('last-update').textContent =
+      'Actualizado: ' + new Date(s.updated_at).toLocaleTimeString('es', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  } catch (e) {
+    document.getElementById('warn').style.display = 'block';
+    document.getElementById('last-update').textContent = 'Sin datos';
+  }
+}
+
+function loadAll() {
+  loadState();
+  loadJournal();
+}
+
+loadAll();
+setInterval(loadAll, 5000);
+</script>
+</body>
+</html>
